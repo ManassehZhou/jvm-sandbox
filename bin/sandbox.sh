@@ -11,7 +11,7 @@ typeset SANDBOX_HOME_DIR
 [[ -z ${SANDBOX_HOME_DIR} ]] && SANDBOX_HOME_DIR=${PWD}/..
 
 # define current SANDBOX_USER
-typeset SANDBOX_USER=${USER}
+typeset SANDBOX_USER=$(whoami)
 [[ -z ${SANDBOX_USER} ]] && SANDBOX_USER=$(whoami)
 
 # define sandbox's network
@@ -20,8 +20,11 @@ typeset SANDBOX_SERVER_NETWORK
 # define sandbox's lib
 typeset SANDBOX_LIB_DIR=${SANDBOX_HOME_DIR}/lib
 
+# define share tmp path
+typeset SHARE_TMP_PATH=/home/${SANDBOX_USER}
+
 # define sandbox attach token file
-typeset SANDBOX_TOKEN_FILE="${HOME}/.sandbox.token"
+typeset SANDBOX_TOKEN_FILE="${SHARE_TMP_PATH}/.sandbox.token"
 
 # define JVM OPS
 typeset SANDBOX_JVM_OPS="-Xms128M -Xmx128M -Xnoclassgc -ea"
@@ -36,7 +39,6 @@ typeset DEFAULT_TARGET_SERVER_IP="0.0.0.0"
 # define target SERVER network port
 typeset TARGET_SERVER_PORT
 
-# define target NAMESPACE
 typeset TARGET_NAMESPACE
 typeset DEFAULT_NAMESPACE="default"
 
@@ -187,9 +189,9 @@ check_permission() {
   pgrep -U "${SANDBOX_USER}" | grep "${TARGET_JVM_PID}" > /dev/null ||
     exit_on_err 1 "permission denied, ${SANDBOX_USER} is not allow attach to ${TARGET_JVM_PID}."
 
-  # check $HOME is writeable
-  [[ ! -w ${HOME} ]] &&
-    exit_on_err 1 "permission denied, ${HOME} is not writable."
+  # check SHARE_TMP_PATH is writeable
+  [[ ! -w ${SHARE_TMP_PATH} ]] &&
+    exit_on_err 1 "permission denied, ${SHARE_TMP_PATH} is not writable."
 
   # check SANDBOX-LIB is readable
   [[ ! -r ${SANDBOX_LIB_DIR} ]] &&
@@ -257,7 +259,7 @@ function attach_jvm() {
     -jar "${SANDBOX_LIB_DIR}/sandbox-core.jar" \
     "${TARGET_JVM_PID}" \
     "${SANDBOX_LIB_DIR}/sandbox-agent.jar" \
-    "home=${SANDBOX_HOME_DIR};token=${token};server.ip=${TARGET_SERVER_IP};server.port=${TARGET_SERVER_PORT};namespace=${TARGET_NAMESPACE}" ||
+    "home=${SANDBOX_HOME_DIR};token=${token};server.ip=${TARGET_SERVER_IP};server.port=${TARGET_SERVER_PORT};namespace=${TARGET_NAMESPACE};tmp=${SHARE_TMP_PATH}" ||
     exit_on_err 1 "attach JVM ${TARGET_JVM_PID} fail."
 
   # get network from attach result
@@ -327,6 +329,8 @@ function main() {
       OP_MODULE_DETAIL=1
       ARG_MODULE_DETAIL=${OPTARG}
       ;;
+    t) SHARE_TMP_PATH=${OPTARG} ;;
+    j) JAVA_HOME=${OPTARG};;
     I) TARGET_SERVER_IP=${OPTARG} ;;
     P) TARGET_SERVER_PORT=${OPTARG} ;;
     C) OP_CONNECT_ONLY=1 ;;
@@ -342,6 +346,8 @@ function main() {
       ;;
     esac
   done
+
+  [[ ! -z ${SHARE_TMP_PATH} ]] && SANDBOX_TOKEN_FILE="${SHARE_TMP_PATH}/.sandbox.token"
 
   reset_for_env
   check_permission
